@@ -239,69 +239,75 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
         if Value then
             task.spawn(function()
                 while _G.autoLoopUpgraders do
-                    if _G.boostOres == true then
-                        print("boostOres: " .. tostring(_G.boostOres))
-                        local upgraders = getUpgraders()
-                        print("upgraders: " .. #upgraders)
-                        local droppedOres = getDropped()
-                        local teslaResetter = nil
-                        for _, v in pairs(upgraders) do
-                            if v.Name == "Tesla Resetter" then
-                                print("Found Tesla Resetter")
-                                teslaResetter = v
-                                break
+                    local success, message = pcall(function()
+                        if _G.boostOres == true then
+                            print("boostOres: " .. tostring(_G.boostOres))
+                            local upgraders = getUpgraders()
+                            print("upgraders: " .. #upgraders)
+                            local droppedOres = getDropped()
+                            local teslaResetter = nil
+                            for _, v in pairs(upgraders) do
+                                if v.Name == "Tesla Resetter" then
+                                    print("Found Tesla Resetter")
+                                    teslaResetter = v
+                                    break
+                                end
+                                print("No Tesla Resetter found.")
                             end
-                            print("No Tesla Resetter found.")
-                        end
-                        print("teslaResetter: " .. tostring(teslaResetter))
+                            print("teslaResetter: " .. tostring(teslaResetter))
 
-                        if #upgraders > 0 and #droppedOres > 0 and teslaResetter ~= nil then
-                            for i, v2 in pairs(getDropped()) do
-                                local upgraderCount = 0
-                                for passCount = 1, 2 do
-                                    if _G.boostOres == false then
-                                        break
-                                    end
+                            if #upgraders > 0 and #droppedOres > 0 and teslaResetter ~= nil then
+                                for i, v2 in pairs(getDropped()) do
+                                    local upgraderCount = 0
+                                    for passCount = 1, 2 do
+                                        if _G.boostOres == false then
+                                            break
+                                        end
 
-                                    for i2, v in pairs(upgraders) do
-                                        if v ~= teslaResetter and v.Model then
-                                            upgraderCount = upgraderCount + 1
-                                            if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
-                                                firetouchinterest(v2,v.Model.Upgrade,0)
-                                                task.wait()
-                                                firetouchinterest(v2,v.Model.Upgrade,1)
-                                            elseif v.Model:FindFirstChild("Upgrader") and v.Model.Upgrader then
-                                                firetouchinterest(v2,v.Model.Upgrader,0)
-                                                task.wait()
-                                                firetouchinterest(v2,v.Model.Upgrader,1)
-                                            elseif v.Model:FindFirstChild("Cannon") and v.Model.Cannon then
-                                                firetouchinterest(v2,v.Model.Cannon,0)
-                                                task.wait()
-                                                firetouchinterest(v2,v.Model.Cannon,1)
+                                        for i2, v in pairs(upgraders) do
+                                            if v ~= teslaResetter and v.Model then
+                                                upgraderCount = upgraderCount + 1
+                                                if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
+                                                    firetouchinterest(v2,v.Model.Upgrade,0)
+                                                    task.wait()
+                                                    firetouchinterest(v2,v.Model.Upgrade,1)
+                                                elseif v.Model:FindFirstChild("Upgrader") and v.Model.Upgrader then
+                                                    firetouchinterest(v2,v.Model.Upgrader,0)
+                                                    task.wait()
+                                                    firetouchinterest(v2,v.Model.Upgrader,1)
+                                                elseif v.Model:FindFirstChild("Cannon") and v.Model.Cannon then
+                                                    firetouchinterest(v2,v.Model.Cannon,0)
+                                                    task.wait()
+                                                    firetouchinterest(v2,v.Model.Cannon,1)
+                                                end
                                             end
+                                        end
+
+                                        if teslaResetter and teslaResetter.Model:FindFirstChild("Upgrade") then
+                                            firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
+                                            task.wait()
+                                            firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
                                         end
                                     end
 
-                                    if teslaResetter and teslaResetter.Model:FindFirstChild("Upgrade") then
-                                        firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
-                                        task.wait()
-                                        firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
+                                    print("Ore went through " .. upgraderCount .. " upgraders.")
+
+                                    if myFactory:FindFirstChild("Invasive Cyberlord") then
+                                        firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 0)
+                                        firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 1)
                                     end
                                 end
-
-                                print("Ore went through " .. upgraderCount .. " upgraders.")
-
-                                if myFactory:FindFirstChild("Invasive Cyberlord") then
-                                    firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 0)
-                                    firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 1)
-                                end
+                            else
+                                print("No upgraders or dropped ores found")
+                                task.wait(1)
                             end
                         else
-                            print("No upgraders or dropped ores found")
+                            print("boostOres is false")
                             task.wait(1)
                         end
-                    else
-                        print("boostOres is false")
+                    end)
+                    if not success then
+                        print("An error occurred: " .. tostring(message))
                         task.wait(1)
                     end
                 end
@@ -309,6 +315,86 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
         end
     end
 })
+
+-- local autoloopupgraders = oreboostingtab:CreateToggle({
+--     Name = "Auto Loop Upgraders",
+--     CurrentValue = true,
+--     Flag = "AutoLoopUpgraders",
+--     Callback = function(Value)
+--         _G.autoLoopUpgraders = Value
+--         if Value then
+--             task.spawn(function()
+--                 while _G.autoLoopUpgraders do
+--                     if _G.boostOres == true then
+--                         print("boostOres: " .. tostring(_G.boostOres))
+--                         local upgraders = getUpgraders()
+--                         print("upgraders: " .. #upgraders)
+--                         local droppedOres = getDropped()
+--                         local teslaResetter = nil
+--                         for _, v in pairs(upgraders) do
+--                             if v.Name == "Tesla Resetter" then
+--                                 print("Found Tesla Resetter")
+--                                 teslaResetter = v
+--                                 break
+--                             end
+--                             print("No Tesla Resetter found.")
+--                         end
+--                         print("teslaResetter: " .. tostring(teslaResetter))
+
+--                         if #upgraders > 0 and #droppedOres > 0 and teslaResetter ~= nil then
+--                             for i, v2 in pairs(getDropped()) do
+--                                 local upgraderCount = 0
+--                                 for passCount = 1, 2 do
+--                                     if _G.boostOres == false then
+--                                         break
+--                                     end
+
+--                                     for i2, v in pairs(upgraders) do
+--                                         if v ~= teslaResetter and v.Model then
+--                                             upgraderCount = upgraderCount + 1
+--                                             if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
+--                                                 firetouchinterest(v2,v.Model.Upgrade,0)
+--                                                 task.wait()
+--                                                 firetouchinterest(v2,v.Model.Upgrade,1)
+--                                             elseif v.Model:FindFirstChild("Upgrader") and v.Model.Upgrader then
+--                                                 firetouchinterest(v2,v.Model.Upgrader,0)
+--                                                 task.wait()
+--                                                 firetouchinterest(v2,v.Model.Upgrader,1)
+--                                             elseif v.Model:FindFirstChild("Cannon") and v.Model.Cannon then
+--                                                 firetouchinterest(v2,v.Model.Cannon,0)
+--                                                 task.wait()
+--                                                 firetouchinterest(v2,v.Model.Cannon,1)
+--                                             end
+--                                         end
+--                                     end
+
+--                                     if teslaResetter and teslaResetter.Model:FindFirstChild("Upgrade") then
+--                                         firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
+--                                         task.wait()
+--                                         firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
+--                                     end
+--                                 end
+
+--                                 print("Ore went through " .. upgraderCount .. " upgraders.")
+
+--                                 if myFactory:FindFirstChild("Invasive Cyberlord") then
+--                                     firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 0)
+--                                     firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 1)
+--                                 end
+--                             end
+--                         else
+--                             print("No upgraders or dropped ores found")
+--                             task.wait(1)
+--                         end
+--                     else
+--                         print("boostOres is false")
+--                         task.wait(1)
+--                     end
+--                 end
+--             end)
+--         end
+--     end
+-- })
 -- END Ore boosting
 
 -- AntiAfk
