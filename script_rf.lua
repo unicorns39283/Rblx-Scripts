@@ -75,19 +75,31 @@ function getUpgraders()
     end
     return tbl
 end
+function getFurnaces()
+    tbl = {}
+    for i,v in pairs(myFactory:GetChildren()) do
+        if v:FindFirstChild("Model") then
+            local model = v.Model
+            if model and model:FindFirstChild("Lava") then
+                table.insert(tbl,v)
+            end
+        end
+    end
+    return tbl
+end
 -- Utility Tab
 local utilitytab = window:CreateTab("Utility", 4483362458)
 local conveyorsection = utilitytab:CreateSection("Conveyor Speed")
 
 local speedSlider = utilitytab:CreateSlider({
 	Name = "Conveyor Speed",
-	Range = {0, 100},
+	Range = {1, 100},
 	Increment = 1,
 	Suffix = "%",
 	CurrentValue = 1,
 	Flag = "ConveyorSpeed",
     Callback = function(Value)
-        if _G.speedEnabled == true then
+        if myFactory:FindFirstChild("AdjustSpeed") then
             myFactory.AdjustSpeed.Value = Value
             print("Conveyor Speed set to " .. Value)
         end
@@ -147,10 +159,14 @@ local autosellores = utilitytab:CreateButton({
     Name = "Auto Sell Ores",
     Callback = function()
         for i,v in pairs(getDropped()) do
-            -- TODO: Find smarter way of finding furnace
-            if myFactory:FindFirstChild("Invasive Cyberlord") then
-                firetouchinterest(v, myFactory["Invasive Cyberlord"].Model.Lava, 0)
-                firetouchinterest(v, myFactory["Invasive Cyberlord"].Model.Lava, 1)
+            local furnacezz = getFurnaces()
+            if furnacezz and #furnacezz > 0 then
+                local firstFurnace = furnacezz[1]
+                if firstFurnace.Model:FindFirstChild("Lava") then
+                    firetouchinterest(v, firstFurnace.Model.Lava, 0)
+                    task.wait()
+                    firetouchinterest(v, firstFurnace.Model.Lava, 1)
+                end
             end
         end
     end
@@ -239,10 +255,13 @@ local autorebirthtoggle = autorebirthtab:CreateToggle({
                                 print("   layoutNumber: " .. layoutNumber .. " selectedLayout: " .. selectedLayout)
                                 task.wait(loadLayoutDelay)
                                 if selectedLayout == "Layout 2" then
+                                    print("    Loading layout "..layoutNumber .. ". selectedLayout: " .. selectedLayout)
                                     game:GetService("ReplicatedStorage").Layouts:InvokeServer("Load", "Layout"..layoutNumber)
                                 elseif selectedLayout == "Layout 1" then
+                                    print("    Loading layout "..layoutNumber .. ". selectedLayout: " .. selectedLayout)
                                     game:GetService("ReplicatedStorage").Layouts:InvokeServer("Load", "Layout"..layoutNumber)
                                 elseif selectedLayout == "Layout 3" then
+                                    print("    Loading layout "..layoutNumber .. ". selectedLayout: " .. selectedLayout)
                                     game:GetService("ReplicatedStorage").Layouts:InvokeServer("Load", "Layout"..layoutNumber)
                                 end
                             end
@@ -273,12 +292,12 @@ local autoloadsetupafterrebirth = autorebirthtab:CreateToggle({
 
 local layoutDropdown = autorebirthtab:CreateDropdown({
     Name = "Layout",
-    Options = {"Layout 2", "Layout 1", "Layout 3"},
-    CurrentOption = "Layout 3",
+    Options = {"Layout 1", "Layout 2", "Layout 3"},
+    CurrentOption = "Layout 2",
     Flag = "SelectedLayout",
     Callback = function(Option)
         print(Option)
-        selectedLayout = Option[1] or "Layout 3"
+        selectedLayout = Option[1] or "Layout 2"
     end
 })
 
@@ -317,6 +336,7 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
                     local success, message = pcall(function()
                         local upgraders = getUpgraders()
                         local droppedOres = getDropped()
+                        local furnacezz = getFurnaces()
                         local teslaResetter = nil
 
                         for _, v in pairs(upgraders) do
@@ -334,6 +354,7 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
 
                         if #upgraders > 0 and #droppedOres > 0 then
                             for i, v2 in pairs(getDropped()) do
+                                print(v2.Name)
                                 local upgraderCount = 0
                                 local loopCount = teslaResetter and 2 or _G.loopTimes
                                 for passCount = 1, loopCount do
@@ -365,10 +386,19 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
 
                                 print("Ore went through " .. upgraderCount .. " upgraders.")
 
-                                if myFactory:FindFirstChild("Sacrificial Altar") then
-                                    firetouchinterest(v2, myFactory["Sacrificial Altar"].Model.Lava, 0)
-                                    firetouchinterest(v2, myFactory["Sacrificial Altar"].Model.Lava, 1)
+                                if furnacezz and #furnacezz > 0 then
+                                    local firstFurnace = furnacezz[1]
+                                    if firstFurnace.Model:FindFirstChild("Lava") then
+                                        firetouchinterest(v2, firstFurnace.Model.Lava, 0)
+                                        task.wait()
+                                        firetouchinterest(v2, firstFurnace.Model.Lava, 1)
+                                    end
                                 end
+                                -- if myFactory:FindFirstChild("Basic Furnace") then
+                                --     firetouchinterest(v2, myFactory["Basic Furnace"].Model.Lava, 0)
+                                --     task.wait()
+                                --     firetouchinterest(v2, myFactory["Basic Furnace"].Model.Lava, 1)
+                                -- end
                             end
                         else
                             print("No upgraders or dropped ores found")
