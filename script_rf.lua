@@ -45,6 +45,7 @@ _G.Excavating = false
 _G.cloverCollecting = false
 _G.cloverCollectThread = nil
 _G.boostOres = true
+_G.loopTimes = 1
 -- END Global variables
 
 -- Helper funcs
@@ -320,20 +321,23 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
 
                         for _, v in pairs(upgraders) do
                             if v.Name == "Tesla Resetter" then
-                                print("Found Tesla Resetter")
+                                -- print("Found Tesla Resetter")
                                 teslaResetter = v
                                 break
                             end
-                            print("No Tesla Resetter found.")
+                            -- print("No Tesla Resetter found.")
                         end
-                        print("teslaResetter: " .. tostring(teslaResetter))
+                        -- print("teslaResetter: " .. tostring(teslaResetter))
 
-                        if #upgraders > 0 and #droppedOres > 0 then --and teslaResetter ~= nil then
+                        -- local loopCount = teslaResetter and 2 or _G.loopTimes
+                        -- print("    loopCount: " .. loopCount)
+
+                        if #upgraders > 0 and #droppedOres > 0 then
                             for i, v2 in pairs(getDropped()) do
                                 local upgraderCount = 0
-                                for passCount = 1, 2 do
+                                local loopCount = teslaResetter and 2 or _G.loopTimes
+                                for passCount = 1, loopCount do
                                     for i2, v in pairs(upgraders) do
-                                        --if v ~= teslaResetter and v.Model then
                                         if not teslaResetter or v ~= teslaResetter and v.Model then
                                             upgraderCount = upgraderCount + 1
                                             if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
@@ -361,9 +365,9 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
 
                                 print("Ore went through " .. upgraderCount .. " upgraders.")
 
-                                if myFactory:FindFirstChild("Invasive Cyberlord") then
-                                    firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 0)
-                                    firetouchinterest(v2, myFactory["Invasive Cyberlord"].Model.Lava, 1)
+                                if myFactory:FindFirstChild("Sacrificial Altar") then
+                                    firetouchinterest(v2, myFactory["Sacrificial Altar"].Model.Lava, 0)
+                                    firetouchinterest(v2, myFactory["Sacrificial Altar"].Model.Lava, 1)
                                 end
                             end
                         else
@@ -379,6 +383,18 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
             end)
         end
     end
+})
+
+local loopTimes = oreboostingtab:CreateSlider({
+    Name = "Loop Times",
+    Range = {1, 100},
+    Increment = 1,
+    Suffix = " (1-100)",
+    CurrentValue = 1,
+    Flag = "LoopTimes",
+    Callback = function(Value)
+        _G.loopTimes = Value
+    end,
 })
 
 -- END Ore boosting
