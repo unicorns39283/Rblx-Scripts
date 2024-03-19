@@ -328,12 +328,13 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
                         end
                         print("teslaResetter: " .. tostring(teslaResetter))
 
-                        if #upgraders > 0 and #droppedOres > 0 and teslaResetter ~= nil then
+                        if #upgraders > 0 and #droppedOres > 0 then --and teslaResetter ~= nil then
                             for i, v2 in pairs(getDropped()) do
                                 local upgraderCount = 0
                                 for passCount = 1, 2 do
                                     for i2, v in pairs(upgraders) do
-                                        if v ~= teslaResetter and v.Model then
+                                        --if v ~= teslaResetter and v.Model then
+                                        if not teslaResetter or v ~= teslaResetter and v.Model then
                                             upgraderCount = upgraderCount + 1
                                             if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
                                                 firetouchinterest(v2,v.Model.Upgrade,0)
