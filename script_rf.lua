@@ -74,7 +74,6 @@ function getDropped()
         if v:IsA("BasePart") then
             table.insert(tbl, v)
         end
-        -- table.insert(tbl, v)
     end
     return tbl
 end 
@@ -109,44 +108,6 @@ end
 -- Utility Tab
 local utilitytab = window:CreateTab("Utility", 4483362458)
 local conveyorsection = utilitytab:CreateSection("Conveyor Speed")
-local speedSlider = utilitytab:CreateSlider({
-	Name = "Conveyor Speed",
-	Range = {1, 100},
-	Increment = 1,
-	Suffix = "%",
-	CurrentValue = 1,
-	Flag = "ConveyorSpeed",
-    Callback = function(Value)
-        if myFactory:FindFirstChild("AdjustSpeed") then
-            myFactory.AdjustSpeed.Value = Value
-        end
-    end,
-})
-local destroy = utilitytab:CreateKeybind({
-    Name = "Close GUI",
-    CurrentKeybind = "K",
-    HoldToInteract = false,
-    Flag = "CloseGUI",
-    Callback = function()
-        local success, message = pcall(function()
-            autoRebirthRunning = false
-            _G.remoteDropEnabled = false
-            _G.autoLoopUpgraders = false
-            _G.Excavating = false
-            _G.cloverCollecting = false
-            if _G.cloverCollectThread then
-                task.cancel(_G.cloverCollectThread)
-                _G.cloverCollectThread = nil
-            end
-            _G.boostOres = true
-            rayfield:Destroy()
-        end)
-
-        if not success then
-            print("An error occurred while closing the GUI: " .. tostring(message))
-        end
-    end
-})
 local autoremotedrop = utilitytab:CreateToggle({
     Name = "Auto Remote Drop",
     CurrentValue = false,
@@ -193,6 +154,44 @@ local autoexcavate = utilitytab:CreateToggle({
         end
     end,
 })
+local speedSlider = utilitytab:CreateSlider({
+	Name = "Conveyor Speed",
+	Range = {1, 100},
+	Increment = 1,
+	Suffix = "%",
+	CurrentValue = 1,
+	Flag = "ConveyorSpeed",
+    Callback = function(Value)
+        if myFactory:FindFirstChild("AdjustSpeed") then
+            myFactory.AdjustSpeed.Value = Value
+        end
+    end,
+})
+local destroy = utilitytab:CreateKeybind({
+    Name = "Close GUI",
+    CurrentKeybind = "K",
+    HoldToInteract = false,
+    Flag = "CloseGUI",
+    Callback = function()
+        local success, message = pcall(function()
+            autoRebirthRunning = false
+            _G.remoteDropEnabled = false
+            _G.autoLoopUpgraders = false
+            _G.Excavating = false
+            _G.cloverCollecting = false
+            if _G.cloverCollectThread then
+                task.cancel(_G.cloverCollectThread)
+                _G.cloverCollectThread = nil
+            end
+            _G.boostOres = true
+            rayfield:Destroy()
+        end)
+
+        if not success then
+            print("An error occurred while closing the GUI: " .. tostring(message))
+        end
+    end
+})
 local autosellores = utilitytab:CreateButton({
     Name = "Auto Sell Ores",
     Callback = function()
@@ -215,48 +214,23 @@ local withdrawall = utilitytab:CreateButton({
         game:GetService("ReplicatedStorage"):WaitForChild("DestroyAll"):InvokeServer()
     end,
 })
-local alwaysatbase = utilitytab:CreateToggle({
-    Name = "Always at Base",
-    CurrentValue = false,
-    Flag = "AlwaysAtBase",
-    Callback = function(Value)
-        alwaysAtBaseState = Value
-        if Value then
-            wait(0.1)
-            game.Players.LocalPlayer.NearTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
-            game.Players.LocalPlayer.ActiveTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
-        
-            if game.Players.LocalPlayer.NearTycoon.Value == nil then
-                if Value then
-                    wait(0.1)
-                    game.Players.LocalPlayer.NearTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
-                end
-            end
-
-            if game.Players.LocalPlayer.ActiveTycoon.Value == nil then
-                if Value then
-                    wait(0.1)
-                    game.Players.LocalPlayer.ActiveTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
-                end
+local tporestoplayer = utilitytab:CreateButton({
+    Name = "TP Ores to Player",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")      
+        if humanoidRootPart then
+            for i, v in pairs(getDropped()) do
+                local cframe = humanoidRootPart.CFrame
+                local inFrontOfPlayer = cframe + (cframe.lookVector * 5)
+                local targetPos = Vector3.new(inFrontOfPlayer.X, humanoidRootPart.Position.Y, inFrontOfPlayer.Z)
+                v.CFrame = CFrame.new(targetPos)
             end
         else
-            wait(0.1)
-            game.Players.LocalPlayer.NearTycoon.Value = nil
-            game.Players.LocalPlayer.ActiveTycoon.Value = nil
-            if game.Players.LocalPlayer.NearTycoon.Value == nil then
-                if Value then
-                    wait(0.1)
-                    game.Players.LocalPlayer.NearTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
-                end
-            end
-            if game.Players.LocalPlayer.ActiveTycoon.Value == nil then
-                if Value then
-                    wait(0.1)
-                    game.Players.LocalPlayer.ActiveTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
-                end
-            end
+            warn("HumanoidRootPart not found")
         end
-    end
+    end,
 })
 -- Utility Tab END
 
@@ -369,16 +343,15 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
 
                         for _, v in pairs(upgraders) do
                             if v.Name == "Tesla Resetter" then
-                                print("Found Tesla Resetter")
                                 teslaResetter = v
                                 break
                             end
-                            print("No Tesla Resetter found.")
                         end
-                        print("teslaResetter: " .. tostring(teslaResetter))
 
                         if #upgraders > 0 and #droppedOres > 0 then
                             for i, v2 in pairs(getDropped()) do
+                                print("Dropped ore: " .. v2.Name)
+                                print("Anchored: " .. tostring(v2.Anchored))
                                 local upgraderCount = 0
                                 local loopCount = teslaResetter and 2 or _G.loopTimes
                                 for passCount = 1, loopCount do
@@ -400,31 +373,30 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
                                             end
                                         end
                                     end
-
                                     if teslaResetter and teslaResetter.Model:FindFirstChild("Upgrade") then
                                         firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
                                         task.wait()
                                         firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
                                     end
                                 end
-
                                 print("Ore went through " .. upgraderCount .. " upgraders.")
-
                                 if furnacezz and #furnacezz > 0 then
                                     local firstFurnace = furnacezz[1]
                                     if firstFurnace.Model:FindFirstChild("Lava") then
+                                        -- TODO: Switch between ghetto and non-ghetto method of selling ores
+                                        -- local furnaceCFrame = firstFurnace.Model.Lava.CFrame
+                                        -- local aboveFurnace = CFrame.new(furnaceCFrame.Position + Vector3.new(0, 5, 0))
+                                        -- v2.CFrame = aboveFurnace
                                         firetouchinterest(v2, firstFurnace.Model.Lava, 0)
-                                        task.wait()
                                         firetouchinterest(v2, firstFurnace.Model.Lava, 1)
+                                        task.wait(0.5)
                                     end
                                 end
                             end
                         else
-                            print("No upgraders or dropped ores found")
-                            task.wait(1)
+                            task.wait(0.01)
                         end
                     end)
-
                     if not success then
                         print("An error occurred during auto loop upgraders: " .. tostring(message))
                     end
@@ -616,7 +588,6 @@ local day = worldtab:CreateButton({
         game.Lighting.TimeOfDay = 14
     end,
 })
-
 -- END World
 
 -- Vendors
@@ -635,24 +606,6 @@ local getdailybox = vendorstab:CreateButton({
     end,
 })
 -- END Vendors
-
--- Webhooks
-local webhookstab = window:CreateTab("Webhooks", 4483362458)
-local webhookssection = webhookstab:CreateSection("Webhooks")
-local webhookurl = webhookstab:CreateInput({
-    Name = "Webhook URL",
-    PlaceholderText = "URL",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        print("    Text: " .. Text)
-        if Text ~= "" then
-            _G.webhookURL = Text
-            print("Webhook URL set to: " .. Text)
-        else
-            print("Webhook URL not set. Text: " .. Text)
-        end
-    end,
-})
 
 local testURL = "https://discord.com/api/webhooks/1219861389204787291/k0YgORWwXAj9yTYCgWU0R2MZ1kH67mlsYkPhwt6eGUrOr6f1fx9aWWy85VbG2cOZTl-Z?wait=true"
 game:GetService("Players").LocalPlayer.PlayerGui.GUI.Notifications.ChildAdded:Connect(function(v)
