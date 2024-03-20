@@ -46,7 +46,26 @@ _G.cloverCollecting = false
 _G.cloverCollectThread = nil
 _G.boostOres = true
 _G.loopTimes = 1
+_G.sendToWebhook = false
+_G.webhookURL = ""
 -- END Global variables
+
+-- ArrayList variables
+local ConveyorSpeedState = 1
+local ConveyorSpeedChangeState = false 
+local autoRemoteDropState = false
+local alwaysAtBaseState = false
+local autoRebirthState = false
+local layoutState = false
+local autoLoopUpgradersState = false
+local autoLoopUpgradersLoopTimes = 1
+local teleportToBoxesState = false
+local autoOpenBoxesState = false
+local autoExcavateState = false
+local walkSpeedState = 16
+local jumpPowerState = 50
+local autoCloverCollectState = false
+-- END ArrayList variables
 
 -- Helper funcs
 function getDropped()
@@ -90,7 +109,6 @@ end
 -- Utility Tab
 local utilitytab = window:CreateTab("Utility", 4483362458)
 local conveyorsection = utilitytab:CreateSection("Conveyor Speed")
-
 local speedSlider = utilitytab:CreateSlider({
 	Name = "Conveyor Speed",
 	Range = {1, 100},
@@ -101,11 +119,9 @@ local speedSlider = utilitytab:CreateSlider({
     Callback = function(Value)
         if myFactory:FindFirstChild("AdjustSpeed") then
             myFactory.AdjustSpeed.Value = Value
-            print("Conveyor Speed set to " .. Value)
         end
     end,
 })
-
 local destroy = utilitytab:CreateKeybind({
     Name = "Close GUI",
     CurrentKeybind = "K",
@@ -131,12 +147,12 @@ local destroy = utilitytab:CreateKeybind({
         end
     end
 })
-
 local autoremotedrop = utilitytab:CreateToggle({
     Name = "Auto Remote Drop",
     CurrentValue = false,
     Flag = "AutoRemoteDrop",
     Callback = function(Value)
+        autoRemoteDropState = Value
         _G.remoteDropEnabled = Value
         if Value then
             task.spawn(function()
@@ -154,7 +170,29 @@ local autoremotedrop = utilitytab:CreateToggle({
         end
     end
 })
-
+local autoexcavate = utilitytab:CreateToggle({
+    Name = "Auto Excavate",
+    CurrentValue = false,
+    Flag = "AutoExcavate",
+    Callback = function(Value)
+        autoExcavateState = Value
+        if Value then
+            _G.Excavating = true
+            task.spawn(function()
+                while _G.Excavating do
+                    task.wait()
+                    for i, v in pairs(myFactory:GetChildren()) do
+                        if string.find(v.name, "Excavator") then
+                            fireproximityprompt(v.Model.Internal.ProximityPrompt)
+                        end
+                    end
+                end
+            end)
+        else
+            _G.Excavating = false
+        end
+    end,
+})
 local autosellores = utilitytab:CreateButton({
     Name = "Auto Sell Ores",
     Callback = function()
@@ -171,19 +209,18 @@ local autosellores = utilitytab:CreateButton({
         end
     end
 })
-
 local withdrawall = utilitytab:CreateButton({
     Name = "Withdraw All",
     Callback = function()
         game:GetService("ReplicatedStorage"):WaitForChild("DestroyAll"):InvokeServer()
     end,
 })
-
 local alwaysatbase = utilitytab:CreateToggle({
     Name = "Always at Base",
     CurrentValue = false,
     Flag = "AlwaysAtBase",
     Callback = function(Value)
+        alwaysAtBaseState = Value
         if Value then
             wait(0.1)
             game.Players.LocalPlayer.NearTycoon.Value = game.Players.LocalPlayer.PlayerTycoon.Value
@@ -221,20 +258,17 @@ local alwaysatbase = utilitytab:CreateToggle({
         end
     end
 })
-
 -- Utility Tab END
 
 -- Auto Rebirth Tab
-
 local autorebirthtab = window:CreateTab("Auto Rebirth", 4483362458)
-
 local autorebirthsection = autorebirthtab:CreateSection("Auto Rebirth")
-
 local autorebirthtoggle = autorebirthtab:CreateToggle({
     Name = "Auto Rebirth",
     CurrentValue = false,
     Flag = "AutoRebirth",
     Callback = function(Value)
+        autoRebirthState = Value
         autoRebirthRunning = Value
         if Value then
             task.spawn(function()
@@ -280,7 +314,6 @@ local autorebirthtoggle = autorebirthtab:CreateToggle({
         end
     end
 })
-
 local autoloadsetupafterrebirth = autorebirthtab:CreateToggle({
     Name = "Auto Load Setup After Rebirth",
     CurrentValue = false,
@@ -289,18 +322,16 @@ local autoloadsetupafterrebirth = autorebirthtab:CreateToggle({
         _G.loadLayoutAfterRebirth = Value
     end
 })
-
 local layoutDropdown = autorebirthtab:CreateDropdown({
     Name = "Layout",
     Options = {"Layout 1", "Layout 2", "Layout 3"},
-    CurrentOption = "Layout 2",
+    CurrentOption = "Layout 3",
     Flag = "SelectedLayout",
     Callback = function(Option)
-        print(Option)
-        selectedLayout = Option[1] or "Layout 2"
+        layoutState = Option
+        selectedLayout = Option[1] or "Layout 3"
     end
 })
-
 local delaySlider = autorebirthtab:CreateSlider({
     Name = "Load Layout Delay",
     Range = {0, 60},
@@ -312,23 +343,20 @@ local delaySlider = autorebirthtab:CreateSlider({
         loadLayoutDelay = Value
     end
 })
-
 -- Auto Rebirth Tab END
 
 -- Ore boosting
 local oreboostingtab = window:CreateTab("Ore Boosting", 4483362458)
-
 local oreboostingsection = oreboostingtab:CreateSection("Ore Boosting")
-
 local autoloopupgraderslabel1 = oreboostingtab:CreateLabel("Auto Loop Upgraders will loop all upgraders and then sell the ores.")
 local autoloopupgraderslabel2 = oreboostingtab:CreateLabel("NOTE: Works best with a Tesla Resetter.")
 local autoloopupgraderslabel3 = oreboostingtab:CreateLabel("NOTE: Do NOT use in public servers. You may get reported.")
-
 local autoloopupgraders = oreboostingtab:CreateToggle({
     Name = "Auto Loop Upgraders",
     CurrentValue = true,
     Flag = "AutoLoopUpgraders",
     Callback = function(Value)
+        autoLoopUpgradersState = Value
         _G.autoLoopUpgraders = Value
         if Value then
             task.spawn(function()
@@ -341,20 +369,16 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
 
                         for _, v in pairs(upgraders) do
                             if v.Name == "Tesla Resetter" then
-                                -- print("Found Tesla Resetter")
+                                print("Found Tesla Resetter")
                                 teslaResetter = v
                                 break
                             end
-                            -- print("No Tesla Resetter found.")
+                            print("No Tesla Resetter found.")
                         end
-                        -- print("teslaResetter: " .. tostring(teslaResetter))
-
-                        -- local loopCount = teslaResetter and 2 or _G.loopTimes
-                        -- print("    loopCount: " .. loopCount)
+                        print("teslaResetter: " .. tostring(teslaResetter))
 
                         if #upgraders > 0 and #droppedOres > 0 then
                             for i, v2 in pairs(getDropped()) do
-                                print(v2.Name)
                                 local upgraderCount = 0
                                 local loopCount = teslaResetter and 2 or _G.loopTimes
                                 for passCount = 1, loopCount do
@@ -394,11 +418,6 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
                                         firetouchinterest(v2, firstFurnace.Model.Lava, 1)
                                     end
                                 end
-                                -- if myFactory:FindFirstChild("Basic Furnace") then
-                                --     firetouchinterest(v2, myFactory["Basic Furnace"].Model.Lava, 0)
-                                --     task.wait()
-                                --     firetouchinterest(v2, myFactory["Basic Furnace"].Model.Lava, 1)
-                                -- end
                             end
                         else
                             print("No upgraders or dropped ores found")
@@ -414,7 +433,6 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
         end
     end
 })
-
 local loopTimes = oreboostingtab:CreateSlider({
     Name = "Loop Times",
     Range = {1, 100},
@@ -423,10 +441,10 @@ local loopTimes = oreboostingtab:CreateSlider({
     CurrentValue = 1,
     Flag = "LoopTimes",
     Callback = function(Value)
+        autoLoopUpgradersLoopTimes = Value
         _G.loopTimes = Value
     end,
 })
-
 -- END Ore boosting
 
 -- AntiAfk
@@ -442,47 +460,13 @@ end
 
 -- Crates
 local cratestab = window:CreateTab("Crates", 4483362458)
-
 local cratessection = cratestab:CreateSection("Crates")
-
-local walktoboxes = cratestab:CreateToggle({
-    Name = "Walk to Boxes",
-    CurrentValue = false,
-    Flag = "WalkToBoxes",
-    Callback = function(Value)
-        if Value then
-            repeat
-                wait(0.5)
-                local boxesFolder = workspace:FindFirstChild("Boxes")
-                if boxesFolder then
-                    local currentBox = nil
-
-                    for _, v in pairs(boxesFolder:GetChildren()) do
-                        if v:IsA("BasePart") then
-                            currentBox = v
-                            break
-                        end
-                    end
-
-                    if currentBox then
-                        local humanoid = game.Players.LocalPlayer.Character.Humanoid
-                        humanoid:MoveTo(currentBox.Position)
-                        while humanoid:GetState() ~= Enum.HumanoidStateType.Jumping do
-                            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                            wait()
-                        end
-                    end
-                end
-            until not Value or not currentBox
-        end
-    end,
-})
-
 local teleporttoboxes = cratestab:CreateToggle({
     Name = "Teleport to Boxes",
     CurrentValue = false,
     Flag = "TeleportToBoxes",
     Callback = function(Value)
+        teleportToBoxesState = Value
         if Value then
             originalCFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
             isTeleporting = true
@@ -513,7 +497,6 @@ local teleporttoboxes = cratestab:CreateToggle({
         end
     end
 })
-
 local selectedCrate = "Regular"
 local crateDropdown = cratestab:CreateDropdown({
     Name = "What box to open?",
@@ -521,16 +504,15 @@ local crateDropdown = cratestab:CreateDropdown({
     CurrentOption = "Regular",
     Flag = "SelectedCrate",
     Callback = function(Option)
-        print(Option)
         selectedCrate = Option[1] or "Regular"
     end
 })
-
 local opencrate = cratestab:CreateToggle({
     Name = "Auto Open Boxes",
     CurrentValue = false,
     Flag = "AutoOpenBoxes",
     Callback = function(Value)
+        autoOpenBoxesState = Value
         if Value then
             task.spawn(function()
                 while Value do
@@ -552,33 +534,7 @@ local opencrate = cratestab:CreateToggle({
 
 -- Player
 local playertab = window:CreateTab("Player", 4483362458)
-
 local playersection = playertab:CreateSection("Player")
-
--- proximity prompt
-local autoexcavate = playertab:CreateToggle({
-    Name = "Auto Excavate",
-    CurrentValue = false,
-    Flag = "AutoExcavate",
-    Callback = function(Value)
-        if Value then
-            _G.Excavating = true
-            task.spawn(function()
-                while _G.Excavating do
-                    task.wait()
-                    for i, v in pairs(myFactory:GetChildren()) do
-                        if string.find(v.name, "Excavator") then
-                            fireproximityprompt(v.Model.Internal.ProximityPrompt)
-                        end
-                    end
-                end
-            end)
-        else
-            _G.Excavating = false
-        end
-    end,
-})
-
 local walkspeedslider = playertab:CreateSlider({
     Name = "Walk Speed",
     Range = {16, 100},
@@ -587,10 +543,10 @@ local walkspeedslider = playertab:CreateSlider({
     CurrentValue = 16,
     Flag = "WalkSpeed",
     Callback = function(Value)
+        walkSpeedState = Value
         game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
     end,
 })
-
 local jumppowerslider = playertab:CreateSlider({
     Name = "Jump Power",
     Range = {50, 200},
@@ -599,6 +555,7 @@ local jumppowerslider = playertab:CreateSlider({
     CurrentValue = 10,
     Flag = "JumpPower",
     Callback = function(Value)
+        jumpPowerState = Value
         game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
     end,
 })
@@ -607,14 +564,13 @@ local jumppowerslider = playertab:CreateSlider({
 -- Events (Yearly ones like clovers)
 
 local eventstab = window:CreateTab("Events", 4483362458)
-
 local eventssection = eventstab:CreateSection("Events")
-
 local autoclovercollect = eventstab:CreateToggle({
     Name = "Auto Clover Collect",
     CurrentValue = false,
     Flag = "AutoCloverCollect",
     Callback = function(Value)
+        autoCloverCollectState = Value
         _G.cloverCollecting = Value
         if Value then
             _G.cloverCollectThread = task.spawn(function()
@@ -643,23 +599,17 @@ local autoclovercollect = eventstab:CreateToggle({
         end
     end,
 })
-
 -- END Events
 
--- END Misc Tab
-
--- World
+-- Visual
 local worldtab = window:CreateTab("World", 4483362458)
-
 local worldsection = worldtab:CreateSection("World")
-
 local night = worldtab:CreateButton({
     Name = "Night",
     Callback = function()
         game.Lighting.TimeOfDay = 0
     end,
 })
-
 local day = worldtab:CreateButton({
     Name = "Day",
     Callback = function()
@@ -671,21 +621,97 @@ local day = worldtab:CreateButton({
 
 -- Vendors
 local vendorstab = window:CreateTab("Vendors", 4483362458)
-
 local vendorssection = vendorstab:CreateSection("Vendors")
-
 local stpatricksday = vendorstab:CreateButton({
     Name = "St. Patrick's Day",
     Callback = function()
         game.Players.LocalPlayer.PlayerGui.GUI.Patrick.Visible = true
     end,
 })
-
 local getdailybox = vendorstab:CreateButton({
     Name = "Get Daily Box",
     Callback = function()
         firesignal(game:GetService("Players").LocalPlayer.PlayerGui.GUI.SpookMcDookShop.RedeemFrame.MouseButton1Click)
     end,
 })
-
 -- END Vendors
+
+-- Webhooks
+local webhookstab = window:CreateTab("Webhooks", 4483362458)
+local webhookssection = webhookstab:CreateSection("Webhooks")
+local webhookurl = webhookstab:CreateInput({
+    Name = "Webhook URL",
+    PlaceholderText = "URL",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        print("    Text: " .. Text)
+        if Text ~= "" then
+            _G.webhookURL = Text
+            print("Webhook URL set to: " .. Text)
+        else
+            print("Webhook URL not set. Text: " .. Text)
+        end
+    end,
+})
+
+local testURL = "https://discord.com/api/webhooks/1219861389204787291/k0YgORWwXAj9yTYCgWU0R2MZ1kH67mlsYkPhwt6eGUrOr6f1fx9aWWy85VbG2cOZTl-Z?wait=true"
+game:GetService("Players").LocalPlayer.PlayerGui.GUI.Notifications.ChildAdded:Connect(function(v)
+    local function processNotification(item)
+        if item.Tier.Text ~= "Reborn" or item.Tier.Text ~= "Slipstream" then
+            return
+        end
+
+        local lifeValue = game:GetService("Players").LocalPlayer.leaderstats.Life.Value
+        local imageid = item.Icon.Image
+
+        if string.find(imageid, "rbxasset") then
+            imageid = string.split(tostring(item.Icon.Image), "//")[2]
+        end
+
+        local imagedata = game:GetService("HttpService"):JSONDecode(request({
+            Url = "https://thumbnails.roblox.com/v1/assets?assetIds=" .. tonumber(imageid) .. "&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false"
+        }).Body)
+        local imagelink = imagedata.data[1]["imageUrl"]
+
+        local data = {
+            ["embeds"] = {
+                {
+                    ["title"] = "Test Webhook",
+                    ["fields"] = {
+                        {
+                            ["name"] = "Rebirth",
+                            ["value"] = tostring("```\n" .. lifeValue .. "```"),
+                            ["inline"] = true
+                        },
+                        {
+                            ["name"] = "Item",
+                            ["value"] = tostring("```\n" .. item.Title.Text .. "```"),
+                            ["inline"] = true
+                        },
+                        {
+                            ["name"] = "Tier",
+                            ["value"] = tostring("```\n" .. item.Tier.Text .. "```"),
+                            ["inline"] = true
+                        },
+                    },
+                    ["color"] = tonumber("0x" .. tostring(string.split(string.format("#%02X%02X%02X", 255, 0, 0), "#")[2])),
+                    ["footer"] = {
+                        ["text"] = "Testing | " .. os.date()
+                    },
+                    ["thumbnail"] = {
+                        ["url"] = tostring(imagelink)
+                    }
+                }
+            }
+        }
+        request({
+            Url = testURL,
+            Body = game:GetService("HttpService"):JSONEncode(data),
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"}
+        })
+    end
+    if (v.Name == "ItemTemplate" or v.Name == "ItemTemplateMini") and v:FindFirstChild("Title") and v:FindFirstChild("Tier") and v:FindFirstChild("Icon") then
+        processNotification(v)
+    end
+end)
