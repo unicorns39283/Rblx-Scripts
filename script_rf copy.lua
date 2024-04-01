@@ -39,15 +39,22 @@ local autoRebirthRunning = false
 local remoteDropEnabled = false
 
 _G.loadLayoutAfterRebirth = false
+_G.justRebirthed = false
 _G.remoteDropEnabled = false
 _G.autoLoopUpgraders = false
+_G.autoBoxTP = false
+_G.autoPulse = false
+_G.autoRPFarm = false
 _G.Excavating = false
+_G.autoOpenBoxes = false
 _G.cloverCollecting = false
 _G.cloverCollectThread = nil
 _G.boostOres = true
 _G.loopTimes = 1
 _G.sendToWebhook = false
 _G.webhookURL = ""
+_G.loopNTimesWithTeslaResetter = false
+_G.teleportCoroutine = nil
 -- END Global variables
 
 -- ArrayList variables
@@ -154,6 +161,28 @@ local autoexcavate = utilitytab:CreateToggle({
         end
     end,
 })
+local autopulse = utilitytab:CreateToggle({
+    Name = "Auto Pulse",
+    CurrentValue = false,
+    Flag = "AutoPulse",
+    Callback = function(Value)
+        _G.autoPulse = Value
+        if Value then
+            task.spawn(function()
+                while _G.autoPulse do
+                    local success, message = pcall(function()
+                        task.wait()
+                        game:GetService("ReplicatedStorage").Pulse:FireServer()
+                    end)
+                    if not success then
+                        print("An error occurred during auto pulse: " .. tostring(message))
+                        _G.autoPulse = false
+                    end
+                end
+            end)
+        end
+    end
+})
 local speedSlider = utilitytab:CreateSlider({
 	Name = "Conveyor Speed",
 	Range = {1, 100},
@@ -179,6 +208,14 @@ local destroy = utilitytab:CreateKeybind({
             _G.autoLoopUpgraders = false
             _G.Excavating = false
             _G.cloverCollecting = false
+            _G.autoRPFarm = false
+            _G.autoPulse = false
+            _G.autoBoxTP = false
+            _G.autoOpenBoxes = false
+            if _G.teleportCoroutine then
+                coroutine.close(_G.teleportCoroutine)
+                _G.teleportCoroutine = nil
+            end
             if _G.cloverCollectThread then
                 task.cancel(_G.cloverCollectThread)
                 _G.cloverCollectThread = nil
@@ -253,6 +290,7 @@ local autorebirthtoggle = autorebirthtab:CreateToggle({
                             -- _G.boostOres = false
                             print("We have enough money for rebirth.")
                             game:GetService("ReplicatedStorage").Rebirth:InvokeServer(26)
+                            _G.justRebirthed = true
                             print("loadLayoutAfterRebirth = " .. tostring(_G.loadLayoutAfterRebirth))
                             task.wait(0.25)
                             print("loadLayoutAfterRebirth = " .. tostring(_G.loadLayoutAfterRebirth))
@@ -272,6 +310,8 @@ local autorebirthtoggle = autorebirthtab:CreateToggle({
                                     print("    Loading layout "..layoutNumber .. ". selectedLayout: " .. selectedLayout)
                                     game:GetService("ReplicatedStorage").Layouts:InvokeServer("Load", "Layout"..layoutNumber)
                                 end
+                                task.wait(1)
+                                _G.justRebirthed = false
                             end
                         end
                     end)
@@ -325,21 +365,111 @@ local oreboostingsection = oreboostingtab:CreateSection("Ore Boosting")
 local autoloopupgraderslabel1 = oreboostingtab:CreateLabel("Auto Loop Upgraders will loop all upgraders and then sell the ores.")
 local autoloopupgraderslabel2 = oreboostingtab:CreateLabel("NOTE: Works best with a Tesla Resetter.")
 local autoloopupgraderslabel3 = oreboostingtab:CreateLabel("NOTE: Do NOT use in public servers. You may get reported.")
+-- local autoloopupgraders = oreboostingtab:CreateToggle({
+--     Name = "Auto Loop Upgraders",
+--     CurrentValue = true,
+--     Flag = "AutoLoopUpgraders",
+--     Callback = function(Value)
+--         autoLoopUpgradersState = Value
+--         _G.autoLoopUpgraders = Value
+--         if Value then
+--             task.spawn(function()
+--                 while _G.autoLoopUpgraders do
+--                     local success, message = pcall(function()
+--                         local upgraders = getUpgraders()
+--                         local droppedOres = getDropped()
+--                         local furnacezz = getFurnaces()
+--                         local teslaResetter = nil
+
+--                         for _, v in pairs(upgraders) do
+--                             if v.Name == "Tesla Resetter" then
+--                                 teslaResetter = v
+--                                 break
+--                             end
+--                         end
+
+--                         if #upgraders > 0 and #droppedOres > 0 then
+--                             for i, v2 in pairs(getDropped()) do
+--                                 print("Dropped ore: " .. v2.Name)
+--                                 print("Anchored: " .. tostring(v2.Anchored))
+--                                 local upgraderCount = 0
+--                                 local loopCount = _G.loopNTimesWithTeslaResetter and _G.loopTimes or (teslaResetter and 2 or _G.loopTimes)
+--                                 -- local loopCount = teslaResetter and 2 or _G.loopTimes
+--                                 for passCount = 1, loopCount do
+--                                     for i2, v in pairs(upgraders) do
+--                                         if not teslaResetter or v ~= teslaResetter and v.Model then
+--                                             upgraderCount = upgraderCount + 1
+--                                             if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
+--                                                 firetouchinterest(v2,v.Model.Upgrade,0)
+--                                                 task.wait()
+--                                                 firetouchinterest(v2,v.Model.Upgrade,1)
+--                                             elseif v.Model:FindFirstChild("Upgrader") and v.Model.Upgrader then
+--                                                 firetouchinterest(v2,v.Model.Upgrader,0)
+--                                                 task.wait()
+--                                                 firetouchinterest(v2,v.Model.Upgrader,1)
+--                                             elseif v.Model:FindFirstChild("Cannon") and v.Model.Cannon then
+--                                                 firetouchinterest(v2,v.Model.Cannon,0)
+--                                                 task.wait()
+--                                                 firetouchinterest(v2,v.Model.Cannon,1)
+--                                             end
+--                                         end
+--                                     end
+--                                     if teslaResetter and teslaResetter.Model:FindFirstChild("Upgrade") then
+--                                         firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
+--                                         task.wait()
+--                                         firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
+--                                     end
+--                                 end
+--                                 print("Ore went through " .. upgraderCount .. " upgraders.")
+--                                 if furnacezz and #furnacezz > 0 then
+--                                     local firstFurnace = furnacezz[1]
+--                                     if firstFurnace.Model:FindFirstChild("Lava") then
+--                                         -- TODO: Switch between ghetto and non-ghetto method of selling ores
+--                                         -- local furnaceCFrame = firstFurnace.Model.Lava.CFrame
+--                                         -- local aboveFurnace = CFrame.new(furnaceCFrame.Position + Vector3.new(0, 5, 0))
+--                                         -- v2.CFrame = aboveFurnace
+--                                         firetouchinterest(v2, firstFurnace.Model.Lava, 0)
+--                                         firetouchinterest(v2, firstFurnace.Model.Lava, 1)
+--                                         task.wait()
+--                                     end
+--                                 end
+--                             end
+--                         else
+--                             task.wait()
+--                         end
+--                     end)
+--                     if not success then
+--                         print("An error occurred during auto loop upgraders: " .. tostring(message))
+--                     end
+--                 end
+--             end)
+--         end
+--     end
+-- })
 local autoloopupgraders = oreboostingtab:CreateToggle({
     Name = "Auto Loop Upgraders",
-    CurrentValue = true,
+    CurrentValue = false,
     Flag = "AutoLoopUpgraders",
     Callback = function(Value)
-        autoLoopUpgradersState = Value
         _G.autoLoopUpgraders = Value
         if Value then
             task.spawn(function()
                 while _G.autoLoopUpgraders do
                     local success, message = pcall(function()
+                        if _G.justRebirthed then
+                            task.wait(5)
+                            _G.justRebirthed = false
+                        end
+
                         local upgraders = getUpgraders()
                         local droppedOres = getDropped()
                         local furnacezz = getFurnaces()
-                        local teslaResetter = nil
+                        local teslaResetter
+
+                        if not upgraders or #upgraders == 0 then
+                            task.wait()
+                            return
+                        end
 
                         for _, v in pairs(upgraders) do
                             if v.Name == "Tesla Resetter" then
@@ -348,61 +478,65 @@ local autoloopupgraders = oreboostingtab:CreateToggle({
                             end
                         end
 
-                        if #upgraders > 0 and #droppedOres > 0 then
-                            for i, v2 in pairs(getDropped()) do
-                                print("Dropped ore: " .. v2.Name)
-                                print("Anchored: " .. tostring(v2.Anchored))
-                                local upgraderCount = 0
-                                local loopCount = teslaResetter and 2 or _G.loopTimes
-                                for passCount = 1, loopCount do
-                                    for i2, v in pairs(upgraders) do
-                                        if not teslaResetter or v ~= teslaResetter and v.Model then
-                                            upgraderCount = upgraderCount + 1
-                                            if v.Model:FindFirstChild("Upgrade") and v.Model.Upgrade then
-                                                firetouchinterest(v2,v.Model.Upgrade,0)
+                        local function processOre(v2)
+                            print("Dropped ore: " .. v2.Name)
+                            print("Anchored: " .. tostring(v2.Anchored))
+                            local upgraderCount = 0
+                            local loopCount = teslaResetter and (_G.loopNTimesWithTeslaResetter and _G.loopTimes or 2) or _G.loopTimes
+                            
+                            for passCount = 1, loopCount do
+                                for _, v in pairs(upgraders) do
+                                    if not teslaResetter or v ~= teslaResetter then
+                                        upgraderCount = upgraderCount + 1
+                                        if v.Model then
+                                            local interactionPart = v.Model:FindFirstChild("Upgrade") or v.Model:FindFirstChild("Upgrader") or v.Model:FindFirstChild("Cannon")
+                                            if interactionPart then
+                                                firetouchinterest(v2, interactionPart, 0)
                                                 task.wait()
-                                                firetouchinterest(v2,v.Model.Upgrade,1)
-                                            elseif v.Model:FindFirstChild("Upgrader") and v.Model.Upgrader then
-                                                firetouchinterest(v2,v.Model.Upgrader,0)
-                                                task.wait()
-                                                firetouchinterest(v2,v.Model.Upgrader,1)
-                                            elseif v.Model:FindFirstChild("Cannon") and v.Model.Cannon then
-                                                firetouchinterest(v2,v.Model.Cannon,0)
-                                                task.wait()
-                                                firetouchinterest(v2,v.Model.Cannon,1)
+                                                firetouchinterest(v2, interactionPart, 1)
                                             end
                                         end
                                     end
-                                    if teslaResetter and teslaResetter.Model:FindFirstChild("Upgrade") then
-                                        firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
-                                        task.wait()
-                                        firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
-                                    end
                                 end
-                                print("Ore went through " .. upgraderCount .. " upgraders.")
-                                if furnacezz and #furnacezz > 0 then
-                                    local firstFurnace = furnacezz[1]
-                                    if firstFurnace.Model:FindFirstChild("Lava") then
-                                        -- TODO: Switch between ghetto and non-ghetto method of selling ores
-                                        -- local furnaceCFrame = firstFurnace.Model.Lava.CFrame
-                                        -- local aboveFurnace = CFrame.new(furnaceCFrame.Position + Vector3.new(0, 5, 0))
-                                        -- v2.CFrame = aboveFurnace
-                                        firetouchinterest(v2, firstFurnace.Model.Lava, 0)
-                                        firetouchinterest(v2, firstFurnace.Model.Lava, 1)
-                                        task.wait(0.5)
-                                    end
+                                if teslaResetter and teslaResetter.Model and teslaResetter.Model:FindFirstChild("Upgrade") then
+                                    firetouchinterest(v2, teslaResetter.Model.Upgrade, 0)
+                                    task.wait()
+                                    firetouchinterest(v2, teslaResetter.Model.Upgrade, 1)
                                 end
                             end
+                            print("Ore went through " .. upgraderCount .. " upgraders.")
+                            if furnacezz and #furnacezz > 0 then
+                                local firstFurnace = furnacezz[1]
+                                if firstFurnace.Model:FindFirstChild("Lava") then
+                                    firetouchinterest(v2, firstFurnace.Model.Lava, 0)
+                                    firetouchinterest(v2, firstFurnace.Model.Lava, 1)
+                                    task.wait()
+                                end
+                            end
+                        end
+                        if #upgraders > 0 and #droppedOres > 0 then
+                            for _, ore in pairs(droppedOres) do
+                                coroutine.wrap(processOre)(ore)
+                            end
                         else
-                            task.wait(0.01)
+                            task.wait()
                         end
                     end)
                     if not success then
                         print("An error occurred during auto loop upgraders: " .. tostring(message))
                     end
+                    task.wait()
                 end
             end)
         end
+    end
+})
+local loopNTimesToggle = oreboostingtab:CreateToggle({
+    Name = "Loop N Times with Tesla Resetter",
+    CurrentValue = false,
+    Flag = "LoopNTimesWithTeslaResetter",
+    Callback = function(Value)
+        _G.loopNTimesWithTeslaResetter = Value
     end
 })
 local loopTimes = oreboostingtab:CreateSlider({
@@ -416,6 +550,63 @@ local loopTimes = oreboostingtab:CreateSlider({
         autoLoopUpgradersLoopTimes = Value
         _G.loopTimes = Value
     end,
+})
+local autorpfarming = oreboostingtab:CreateToggle({
+    Name = "Auto RP Farming",
+    CurrentValue = false,
+    Flag = "AutoRPFarming",
+    Callback = function(Value)
+        _G.autoRPFarm = Value
+        local furnaceCache = nil
+        local oreQueue = {}
+        local function processOre(ore, furnace)
+            firetouchinterest(ore, furnace, 0)
+            coroutine.yield()
+            firetouchinterest(ore, furnace, 1)
+        end
+        if Value then
+            task.spawn(function()
+                while _G.autoRPFarm do
+                    local success, message = pcall(function()
+                        if not furnaceCache then
+                            local furnacezz = getFurnaces()
+                            if furnacezz and #furnacezz > 0 then
+                                furnaceCache = furnacezz[1]
+                            end
+                        end
+
+                        local droppedOres = getDropped()
+                        if #droppedOres > 0 and furnaceCache and furnaceCache.Model:FindFirstChild("Lava") then
+                            for i, ore in ipairs(droppedOres) do
+                                oreQueue[i] = coroutine.create(processOre)
+                                coroutine.resume(oreQueue[i], ore, furnaceCache.Model.Lava)
+                            end
+                            for i = 1, #oreQueue do
+                                if coroutine.status(oreQueue[i]) == "suspended" then
+                                    coroutine.resume(oreQueue[i])
+                                end
+                                oreQueue[i] = nil
+                            end
+                        end
+                    end)
+
+                    if not success then
+                        print("An error occurred during auto RP farming: " .. tostring(message))
+                        _G.autoRPFarm = false
+                    end
+
+                    if not furnaceCache then
+                        task.wait(0.1)
+                    else
+                        task.wait()
+                    end
+                end
+                furnaceCache = nil
+            end)
+        else
+            furnaceCache = nil
+        end
+    end
 })
 -- END Ore boosting
 
@@ -438,34 +629,41 @@ local teleporttoboxes = cratestab:CreateToggle({
     CurrentValue = false,
     Flag = "TeleportToBoxes",
     Callback = function(Value)
-        teleportToBoxesState = Value
+        _G.autoBoxTP = Value
         if Value then
-            originalCFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
-            isTeleporting = true
-
-            while isTeleporting do
-                local success, message = pcall(function()
-                    wait(1)
-                    local boxesFolder = workspace:FindFirstChild("Boxes")
-                    if boxesFolder then
-                        for _, v in pairs(boxesFolder:GetChildren()) do
-                            if v:IsA("BasePart") then
-                                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = v.CFrame
+            if not _G.teleportCoroutine then
+                originalCFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+                _G.teleportCoroutine = coroutine.create(function()
+                    while _G.autoBoxTP do
+                        local success, message = pcall(function()
+                            wait(1)
+                            local boxesFolder = workspace:FindFirstChild("Boxes")
+                            if boxesFolder then
+                                for _, v in pairs(boxesFolder:GetChildren()) do
+                                    if v:IsA("BasePart") then
+                                        local targetPos = Vector3.new(v.Position.X, v.Position.Y - 25, v.Position.Z)
+                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos)
+                                        wait(0.5)
+                                    end
+                                end
                             end
+                        end)
+
+                        if not success then
+                            print("An error occurred while teleporting: " .. tostring(message))
                         end
                     end
                 end)
-
-                if not success then
-                    print("An error occurred while teleporting: " .. tostring(message))
-                    isTeleporting = false
-                end
+                coroutine.resume(_G.teleportCoroutine)
             end
         else
+            if _G.teleportCoroutine then
+                coroutine.close(_G.teleportCoroutine)
+                _G.teleportCoroutine = nil
+            end
             if originalCFrame then
                 game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = originalCFrame
             end
-            isTeleporting = false
         end
     end
 })
@@ -484,10 +682,10 @@ local opencrate = cratestab:CreateToggle({
     CurrentValue = false,
     Flag = "AutoOpenBoxes",
     Callback = function(Value)
-        autoOpenBoxesState = Value
+        _G.autoOpenBoxes = Value
         if Value then
             task.spawn(function()
-                while Value do
+                while _G.autoOpenBoxes do
                     local success, message = pcall(function()
                         task.wait(0.5)
                         game:GetService("ReplicatedStorage").MysteryBox:InvokeServer(selectedCrate)
@@ -607,10 +805,12 @@ local getdailybox = vendorstab:CreateButton({
 })
 -- END Vendors
 
-local testURL = "https://discord.com/api/webhooks/1219861389204787291/k0YgORWwXAj9yTYCgWU0R2MZ1kH67mlsYkPhwt6eGUrOr6f1fx9aWWy85VbG2cOZTl-Z?wait=true"
+local testURL = "https://discord.com/api/webhooks/1221621067517399161/WvFhySwRiBPE7Z423dEcDPDnIQXKLGl-LxD3W-fKOWrl8rhEeWkNdmNNzXXT-ivFYexP?wait=true"
 game:GetService("Players").LocalPlayer.PlayerGui.GUI.Notifications.ChildAdded:Connect(function(v)
+    print("here")
     local function processNotification(item)
-        if item.Tier.Text ~= "Reborn" or item.Tier.Text ~= "Slipstream" then
+        if item.Tier.Text ~= "Reborn" and item.Tier.Text ~= "Slipstream" and item.Tier.Text ~= "Adv. Reborn" and item.Tier.Text ~= "Shiny Reborn" then
+            print("Item is not reborn or slipstream. (DEBUG: " .. item.Tier.Text .. ")")
             return
         end
 
